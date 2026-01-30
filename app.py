@@ -233,6 +233,19 @@ def get_markdown(file_id):
         'slides': markdown_storage[file_id]['slides']
     })
 
+@app.route('/api/check/<file_id>')
+def check_presentation(file_id):
+    """API endpoint to check if a presentation exists"""
+    if file_id not in markdown_storage:
+        return jsonify({'exists': False})
+
+    data = markdown_storage[file_id]
+    return jsonify({
+        'exists': True,
+        'filename': data['filename'],
+        'slideCount': len(data['slides'])
+    })
+
 # WebSocket events
 @socketio.on('connect')
 def handle_connect():

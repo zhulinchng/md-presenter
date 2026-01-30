@@ -1,6 +1,8 @@
 // Editor JavaScript
 let socket = null;
 let editor = null;
+let highlightBackdrop = null;
+let highlightContent = null;
 let updateTimeout = null;
 let isSaving = false;
 let currentSlideIndex = 0;
@@ -10,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeEditor();
     initializeWebSocket();
     initializeKeyboardShortcuts();
+    initializeSyntaxHighlighting();
 });
 
 // Initialize Editor
@@ -40,10 +43,9 @@ function initializeEditor() {
     autoResize();
 }
 
-// Auto-resize textarea
+// Auto-resize textarea (no longer needed with overlay system, kept for compatibility)
 function autoResize() {
-    editor.style.height = 'auto';
-    editor.style.height = editor.scrollHeight + 'px';
+    // With the overlay system, textarea is position: absolute and scrolls internally
 }
 
 // Initialize WebSocket
@@ -69,6 +71,7 @@ function initializeWebSocket() {
         if (data.content && editor.value !== data.content) {
             editor.value = data.content;
             autoResize();
+            updateHighlight();
         }
         if (data.slides) {
             updatePreview(data.slides);
@@ -385,12 +388,10 @@ function initializeKeyboardShortcuts() {
 
 // Mermaid rendering
 async function renderMermaidDiagrams() {
-    if (!window.beautifulMermaid) {
-        console.error('beautiful-mermaid not loaded');
+    if (!window.mermaid) {
+        console.error('mermaid not loaded');
         return;
     }
-
-    const { renderMermaid, THEMES } = window.beautifulMermaid;
 
     const mermaidElements = document.querySelectorAll('.mermaid');
 
@@ -413,8 +414,7 @@ async function renderMermaidDiagrams() {
         }
 
         try {
-            // Use github-light theme for editor preview
-            const svg = await renderMermaid(graphDefinition, THEMES['github-light']);
+            const { svg } = await window.mermaid.render('mermaid-editor-' + i, graphDefinition);
             element.innerHTML = svg;
         } catch (e) {
             console.error('Mermaid rendering error:', e);
@@ -436,6 +436,120 @@ setInterval(function() {
         }
     }
 }, 60000); // Update every minute
+
+// Initialize Syntax Highlighting
+function initializeSyntaxHighlighting() {
+    highlightBackdrop = document.getElementById('highlightBackdrop');
+    highlightContent = document.getElementById('highlightContent');
+
+    // Initial highlight
+    updateHighlight();
+
+    // Sync scroll position
+    editor.addEventListener('scroll', syncScroll);
+
+    // Update highlighting on input
+    editor.addEventListener('input', updateHighlight);
+}
+
+// Sync scroll between textarea and backdrop
+function syncScroll() {
+    highlightBackdrop.scrollTop = editor.scrollTop;
+    highlightBackdrop.scrollLeft = editor.scrollLeft;
+}
+
+// Update syntax highlighting
+function updateHighlight() {
+    const text = editor.value;
+    const highlighted = highlightMarkdown(text);
+    // Add a trailing newline to ensure scroll height matches
+    highlightContent.innerHTML = highlighted + '\n';
+}
+
+// Markdown syntax highlighter
+function highlightMarkdown(text) {
+    // Escape HTML first
+    let html = escapeHtml(text);
+
+    // Store code blocks to prevent processing their contents
+    const codeBlocks = [];
+    const inlineCode = [];
+
+    // Extract and protect fenced code blocks
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        const index = codeBlocks.length;
+        codeBlocks.push({ lang, code, full: match });
+        return `\x00CODEBLOCK${index}\x00`;
+    });
+
+    // Extract and protect inline code
+    html = html.replace(/`([^`\n]+)`/g, (match, code) => {
+        const index = inlineCode.length;
+        inlineCode.push(code);
+        return `\x00INLINECODE${index}\x00`;
+    });
+
+    // Horizontal rules (must be before list markers)
+    html = html.replace(/^(---+|___+|\*\*\*+)$/gm, '<span class="md-hr">$1</span>');
+
+    // Headers
+    html = html.replace(/^(#{1,6})(\s+)(.*)$/gm, (match, hashes, space, content) => {
+        return `<span class="md-heading-marker">${hashes}</span>${space}<span class="md-heading">${content}</span>`;
+    });
+
+    // Bold and italic combinations
+    html = html.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<span class="md-bold-italic">***$1***</span>');
+    html = html.replace(/___([^_\n]+)___/g, '<span class="md-bold-italic">___$1___</span>');
+
+    // Bold
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, '<span class="md-bold">**$1**</span>');
+    html = html.replace(/__([^_\n]+)__/g, '<span class="md-bold">__$1__</span>');
+
+    // Italic
+    html = html.replace(/\*([^*\n]+)\*/g, '<span class="md-italic">*$1*</span>');
+    html = html.replace(/_([^_\n]+)_/g, '<span class="md-italic">_$1_</span>');
+
+    // Strikethrough
+    html = html.replace(/~~([^~\n]+)~~/g, '<span class="md-strikethrough">~~$1~~</span>');
+
+    // Images (before links)
+    html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
+        '<span class="md-image-marker">!</span>[<span class="md-link-text">$1</span>](<span class="md-link-url">$2</span>)');
+
+    // Links
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
+        '[<span class="md-link-text">$1</span>](<span class="md-link-url">$2</span>)');
+
+    // Blockquotes
+    html = html.replace(/^(&gt;.*)$/gm, '<span class="md-blockquote">$1</span>');
+
+    // List markers (unordered)
+    html = html.replace(/^(\s*)([-*+])(\s)/gm, '$1<span class="md-list-marker">$2</span>$3');
+
+    // List markers (ordered)
+    html = html.replace(/^(\s*)(\d+\.)(\s)/gm, '$1<span class="md-list-marker">$2</span>$3');
+
+    // Restore inline code
+    html = html.replace(/\x00INLINECODE(\d+)\x00/g, (match, index) => {
+        return `<span class="md-code">\`${inlineCode[parseInt(index)]}\`</span>`;
+    });
+
+    // Restore code blocks
+    html = html.replace(/\x00CODEBLOCK(\d+)\x00/g, (match, index) => {
+        const block = codeBlocks[parseInt(index)];
+        const langSpan = block.lang ? `<span class="md-code-lang">${block.lang}</span>` : '';
+        return `<span class="md-code-block">\`\`\`${langSpan}\n${block.code}\`\`\`</span>`;
+    });
+
+    return html;
+}
+
+// Escape HTML special characters
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 // Collapsible Code Blocks
 function initializeCollapsibleCodeBlocks() {

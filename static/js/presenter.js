@@ -320,23 +320,20 @@ function toggleThumbnails() {
     }
 }
 
-// Get theme colors for mermaid rendering
-function getMermaidThemeColors() {
-    const isDark = theme === 'dark';
-    if (isDark) {
-        return window.beautifulMermaid.THEMES['tokyo-night'];
-    }
-    return window.beautifulMermaid.THEMES['github-light'];
+// Get theme for mermaid rendering
+function getMermaidTheme() {
+    return theme === 'dark' ? 'dark' : 'default';
 }
 
 // Mermaid Diagram Rendering
 async function renderMermaidDiagrams() {
-    if (!window.beautifulMermaid) {
-        console.error('beautiful-mermaid not loaded');
+    if (!window.mermaid) {
+        console.error('mermaid not loaded');
         return;
     }
 
-    const { renderMermaid } = window.beautifulMermaid;
+    // Re-initialize with current theme
+    window.mermaid.initialize({ startOnLoad: false, theme: getMermaidTheme() });
 
     // Re-render all Mermaid diagrams
     const mermaidElements = document.querySelectorAll('.mermaid');
@@ -360,8 +357,7 @@ async function renderMermaidDiagrams() {
         }
 
         try {
-            const themeColors = getMermaidThemeColors();
-            const svg = await renderMermaid(graphDefinition, themeColors);
+            const { svg } = await window.mermaid.render('mermaid-presenter-' + i, graphDefinition);
             element.innerHTML = svg;
         } catch (e) {
             console.error('Mermaid rendering error:', e);
@@ -381,12 +377,10 @@ async function renderMermaidDiagrams() {
 }
 
 async function renderCurrentSlideMermaid() {
-    if (!window.beautifulMermaid) {
-        console.error('beautiful-mermaid not loaded');
+    if (!window.mermaid) {
+        console.error('mermaid not loaded');
         return;
     }
-
-    const { renderMermaid } = window.beautifulMermaid;
 
     const currentSlide = document.querySelector('.slide.active');
     if (currentSlide) {
@@ -406,8 +400,7 @@ async function renderCurrentSlideMermaid() {
             if (!graphDefinition || graphDefinition.startsWith('<svg')) return;
 
             try {
-                const themeColors = getMermaidThemeColors();
-                const svg = await renderMermaid(graphDefinition, themeColors);
+                const { svg } = await window.mermaid.render('mermaid-current-slide', graphDefinition);
                 mermaidElement.innerHTML = svg;
             } catch (e) {
                 console.error('Mermaid rendering error:', e);

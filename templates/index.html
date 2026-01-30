@@ -4,73 +4,192 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MD Presenter - Beautiful Markdown Presentations</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="upload-page">
-    <div class="container">
-        <header class="hero">
-            <h1 class="app-title">MD Presenter</h1>
-            <p class="tagline">Transform your Markdown into stunning presentations</p>
+    <!-- Ambient background -->
+    <div class="ambient-bg">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
+    <div class="landing-container">
+        <!-- Header -->
+        <header class="landing-header">
+            <div class="logo">
+                <span class="logo-mark">M</span>
+                <span class="logo-text">MD Presenter</span>
+            </div>
+            <nav class="header-nav">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#how-it-works" class="nav-link">How it works</a>
+            </nav>
         </header>
 
-        <div class="upload-container">
-            <div id="dropZone" class="drop-zone">
-                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                <h2>Drop your Markdown file here</h2>
-                <p>or click to browse</p>
-                <input type="file" id="fileInput" accept=".md,.markdown" hidden>
-                <button class="browse-btn" onclick="document.getElementById('fileInput').click()">
-                    Choose File
-                </button>
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <div class="hero-badge">Markdown to Presentation</div>
+                <h1 class="hero-title">
+                    Transform your<br>
+                    <span class="title-accent">Markdown</span> into<br>
+                    stunning presentations
+                </h1>
+                <p class="hero-description">
+                    Drop your .md file and watch it come alive. Beautiful slides,
+                    live editing, Mermaid diagrams, and more.
+                </p>
             </div>
 
-            <div id="uploadProgress" class="upload-progress" style="display: none;">
-                <div class="progress-bar">
-                    <div class="progress-fill"></div>
-                </div>
-                <p class="progress-text">Uploading...</p>
-            </div>
-        </div>
+            <div class="hero-upload">
+                <div class="upload-card">
+                    <div id="dropZone" class="drop-zone">
+                        <div class="drop-zone-content">
+                            <div class="upload-icon-wrapper">
+                                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M12 16V4m0 0L8 8m4-4l4 4"></path>
+                                    <path d="M3 20h18"></path>
+                                </svg>
+                            </div>
+                            <div class="drop-zone-text">
+                                <h3>Drop your Markdown here</h3>
+                                <p>or click to browse files</p>
+                            </div>
+                            <input type="file" id="fileInput" accept=".md,.markdown" hidden>
+                            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                                <span>Choose File</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="drop-zone-border"></div>
+                    </div>
 
-        <section class="features">
-            <h3>Features</h3>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <span class="feature-icon">📝</span>
-                    <h4>Markdown Support</h4>
-                    <p>Full markdown syntax with extensions</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🔄</span>
-                    <h4>Live Editing</h4>
-                    <p>Real-time preview as you type</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">📊</span>
-                    <h4>Mermaid Diagrams</h4>
-                    <p>Beautiful diagrams and flowcharts</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🎬</span>
-                    <h4>Rich Media</h4>
-                    <p>Images, videos, and GIFs support</p>
+                    <div id="uploadProgress" class="upload-progress" style="display: none;">
+                        <div class="progress-content">
+                            <div class="progress-spinner"></div>
+                            <p class="progress-text">Uploading...</p>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <div class="file-types">
+                        <span class="file-type">.md</span>
+                        <span class="file-type">.markdown</span>
+                        <span class="file-size">Max 10MB</span>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section class="instructions">
-            <h3>Quick Start</h3>
-            <ol>
-                <li>Create your presentation in Markdown</li>
-                <li>Use <code>---</code> to separate slides</li>
-                <li>Add Mermaid diagrams with <code>```mermaid</code> blocks</li>
-                <li>Drag & drop your file above</li>
-            </ol>
+        <!-- Recent Documents Section -->
+        <section class="recent-section" id="recentSection" style="display: none;">
+            <div class="section-header">
+                <h2 class="section-title">Recent</h2>
+                <button class="clear-recent-btn" id="clearRecentBtn">Clear all</button>
+            </div>
+            <div class="recent-carousel" id="recentCarousel">
+                <!-- Populated by JavaScript -->
+            </div>
         </section>
+
+        <!-- Features Section -->
+        <section class="features-section" id="features">
+            <div class="section-header">
+                <h2 class="section-title">Features</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-number">01</div>
+                    <div class="feature-content">
+                        <h3>Live Editing</h3>
+                        <p>Real-time preview as you type. See changes instantly reflected in your presentation.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-number">02</div>
+                    <div class="feature-content">
+                        <h3>Mermaid Diagrams</h3>
+                        <p>Create flowcharts, sequence diagrams, and more with simple text syntax.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-number">03</div>
+                    <div class="feature-content">
+                        <h3>Syntax Highlighting</h3>
+                        <p>Beautiful code blocks with automatic language detection and highlighting.</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-number">04</div>
+                    <div class="feature-content">
+                        <h3>Rich Media</h3>
+                        <p>Embed images, videos, YouTube, and social media content seamlessly.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How it Works Section -->
+        <section class="how-section" id="how-it-works">
+            <div class="section-header">
+                <h2 class="section-title">How it works</h2>
+            </div>
+            <div class="steps-container">
+                <div class="step">
+                    <div class="step-marker">
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                    </div>
+                    <div class="step-content">
+                        <h4>Write your content</h4>
+                        <p>Create your presentation in any text editor using Markdown syntax.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-marker">
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                    </div>
+                    <div class="step-content">
+                        <h4>Separate slides with <code>---</code></h4>
+                        <p>Use horizontal rules to define where each slide begins and ends.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-marker">
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                    </div>
+                    <div class="step-content">
+                        <h4>Add diagrams</h4>
+                        <p>Include Mermaid diagrams with <code>```mermaid</code> code blocks.</p>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-marker">
+                        <span class="step-line"></span>
+                        <span class="step-dot"></span>
+                    </div>
+                    <div class="step-content">
+                        <h4>Upload & present</h4>
+                        <p>Drag and drop your file above and start presenting immediately.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="landing-footer">
+            <p>Built for beautiful presentations</p>
+        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='js/uploader.js') }}"></script>
