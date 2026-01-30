@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeKeyboardShortcuts();
     initializeTheme();
     updateProgress();
+    initializeCollapsibleCodeBlocks();
 
     // Render mermaid after a short delay to ensure everything is loaded
     setTimeout(() => {
@@ -93,6 +94,9 @@ function showSlide(index) {
     // Show current slide
     if (slides[index]) {
         slides[index].classList.add('active');
+
+        // Process embedded content in the current slide
+        processEmbeddedContent(slides[index]);
     }
 
     // Update thumbnails
@@ -111,6 +115,24 @@ function showSlide(index) {
 
     // Re-render Mermaid diagrams for current slide
     renderCurrentSlideMermaid();
+}
+
+// Process embedded content (Instagram, Twitter, etc.)
+function processEmbeddedContent(slide) {
+    // Re-process Instagram embeds
+    if (window.instgrm && slide.querySelector('.instagram-media')) {
+        window.instgrm.Embeds.process();
+    }
+
+    // Re-process Twitter embeds
+    if (window.twttr && slide.querySelector('.twitter-tweet')) {
+        window.twttr.widgets.load(slide);
+    }
+
+    // Re-process TikTok embeds
+    if (window.TikTok && slide.querySelector('.tiktok-embed')) {
+        window.TikTok.Embeds.process();
+    }
 }
 
 function updateProgress() {
@@ -317,9 +339,21 @@ async function renderMermaidDiagrams() {
 
     for (let i = 0; i < mermaidElements.length; i++) {
         const element = mermaidElements[i];
-        const graphDefinition = element.textContent.trim();
 
-        if (!graphDefinition) continue;
+        // Store original diagram text if not already stored
+        if (!element.dataset.mermaidOriginal) {
+            const originalText = element.textContent.trim();
+            if (originalText && !originalText.startsWith('<svg') && !originalText.startsWith('#mermaid-graph')) {
+                element.dataset.mermaidOriginal = originalText;
+            }
+        }
+
+        // Get the original diagram definition
+        const graphDefinition = element.dataset.mermaidOriginal || element.textContent.trim();
+
+        if (!graphDefinition || graphDefinition.startsWith('<svg') || graphDefinition.startsWith('#mermaid-graph')) {
+            continue;
+        }
 
         try {
             const graphId = `mermaid-graph-${Date.now()}-${i}`;
@@ -351,14 +385,29 @@ async function renderCurrentSlideMermaid() {
     if (currentSlide) {
         const mermaidElement = currentSlide.querySelector('.mermaid');
         if (mermaidElement && !mermaidElement.querySelector('svg')) {
-            const graphDefinition = mermaidElement.textContent.trim();
+            // Store original diagram text if not already stored
+            if (!mermaidElement.dataset.mermaidOriginal) {
+                const originalText = mermaidElement.textContent.trim();
+                if (originalText && !originalText.startsWith('<svg') && !originalText.startsWith('#mermaid-graph')) {
+                    mermaidElement.dataset.mermaidOriginal = originalText;
+                }
+            }
 
-            if (!graphDefinition) return;
+            // Get the original diagram definition
+            const graphDefinition = mermaidElement.dataset.mermaidOriginal || mermaidElement.textContent.trim();
+
+            if (!graphDefinition || graphDefinition.startsWith('<svg') || graphDefinition.startsWith('#mermaid-graph')) return;
 
             try {
                 const graphId = `mermaid-current-${Date.now()}`;
                 const { svg } = await window.mermaid.render(graphId, graphDefinition);
                 mermaidElement.innerHTML = svg;
+
+                // Initialize zoom dimensions
+                const wrapper = mermaidElement.closest('.mermaid-wrapper');
+                if (wrapper && window.mermaidZoomManager) {
+                    window.mermaidZoomManager.storeOriginalDimensions(wrapper);
+                }
             } catch (e) {
                 console.error('Mermaid rendering error:', e);
                 mermaidElement.innerHTML = `<div style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px;">
@@ -460,6 +509,9 @@ function updateSlides(slides) {
     // Re-render Mermaid diagrams
     renderMermaidDiagrams();
 
+    // Initialize collapsible code blocks for new content
+    initializeCollapsibleCodeBlocks();
+
     // Update progress
     updateProgress();
 }
@@ -492,23 +544,76 @@ function handleSwipe() {
     }
 }
 
-// Mouse wheel navigation (optional) - disabled when over mermaid diagram
-document.addEventListener('wheel', function(e) {
-    // Check if mouse is over a mermaid container
-    if (e.target.closest('.mermaid-container')) {
-        return; // Don't navigate when scrolling/zooming mermaid
-    }
+// Mouse wheel navigation is disabled - users can scroll within slides freely
+// Slide navigation is done via arrow keys, buttons, or swipe gestures
 
-    if (e.ctrlKey || e.metaKey) {
-        return; // Don't interfere with browser zoom
-    }
+// Collapsible Code Blocks
+function initializeCollapsibleCodeBlocks() {
+    // Find all code blocks (both plain pre and highlighted)
+    const codeBlocks = document.querySelectorAll('.slide-content pre, .slide-content .highlight');
 
-    if (e.deltaY > 0) {
-        nextSlide();
-    } else if (e.deltaY < 0) {
-        previousSlide();
-    }
-}, { passive: false });
+    codeBlocks.forEach((block, index) => {
+        // Skip if already wrapped
+        if (block.closest('.code-block-wrapper')) return;
+
+        // Skip if it's a pre inside a highlight (already handled)
+        if (block.tagName === 'PRE' && block.closest('.highlight')) return;
+
+        // Get language from class if available
+        let language = 'code';
+        const codeElement = block.querySelector('code') || block;
+        const classList = codeElement.className || '';
+        const langMatch = classList.match(/language-(\w+)|highlight-(\w+)|(\w+)/);
+        if (langMatch) {
+            language = langMatch[1] || langMatch[2] || langMatch[3] || 'code';
+        }
+
+        // Check if this is a mermaid code block (check content for mermaid syntax)
+        const text = block.textContent || '';
+        const isMermaid = language.toLowerCase() === 'mermaid' ||
+                          text.trim().match(/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline)\s/i);
+
+        // Count lines
+        const lines = text.split('\n').filter(line => line.trim() !== '').length;
+
+        // Create wrapper - collapse mermaid by default
+        const wrapper = document.createElement('div');
+        wrapper.className = isMermaid ? 'code-block-wrapper collapsed' : 'code-block-wrapper';
+
+        // Create header
+        const header = document.createElement('div');
+        header.className = 'code-block-header';
+        header.innerHTML = `
+            <div class="code-info">
+                <span class="code-language">${isMermaid ? 'mermaid' : language}</span>
+                <span class="code-lines">${lines} line${lines !== 1 ? 's' : ''}</span>
+            </div>
+            <button class="code-collapse-btn" onclick="toggleCodeBlock(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+                <span>${isMermaid ? 'Expand' : 'Collapse'}</span>
+            </button>
+        `;
+
+        // Create content wrapper
+        const content = document.createElement('div');
+        content.className = 'code-block-content';
+
+        // Wrap the original block
+        block.parentNode.insertBefore(wrapper, block);
+        content.appendChild(block);
+        wrapper.appendChild(header);
+        wrapper.appendChild(content);
+    });
+}
+
+function toggleCodeBlock(button) {
+    const wrapper = button.closest('.code-block-wrapper');
+    const isCollapsed = wrapper.classList.toggle('collapsed');
+    const buttonText = button.querySelector('span');
+    buttonText.textContent = isCollapsed ? 'Expand' : 'Collapse';
+}
 
 // Zoom functions are now handled by mermaid-zoom.js
 

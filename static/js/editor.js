@@ -214,6 +214,9 @@ function showSlidePreview(slide) {
     if (slide.mermaid) {
         renderMermaidDiagrams();
     }
+
+    // Initialize collapsible code blocks
+    initializeCollapsibleCodeBlocks();
 }
 
 // Jump to selected slide
@@ -430,9 +433,21 @@ async function renderMermaidDiagrams() {
 
     for (let i = 0; i < mermaidElements.length; i++) {
         const element = mermaidElements[i];
-        const graphDefinition = element.textContent.trim();
 
-        if (!graphDefinition) continue;
+        // Store original diagram text if not already stored
+        if (!element.dataset.mermaidOriginal) {
+            const originalText = element.textContent.trim();
+            if (originalText && !originalText.startsWith('<svg') && !originalText.startsWith('#mermaid-preview')) {
+                element.dataset.mermaidOriginal = originalText;
+            }
+        }
+
+        // Get the original diagram definition
+        const graphDefinition = element.dataset.mermaidOriginal || element.textContent.trim();
+
+        if (!graphDefinition || graphDefinition.startsWith('<svg') || graphDefinition.startsWith('#mermaid-preview')) {
+            continue;
+        }
 
         try {
             const graphId = `mermaid-preview-${Date.now()}-${i}`;
@@ -466,3 +481,71 @@ setInterval(function() {
 }, 60000); // Update every minute
 
 // Zoom functions are now handled by mermaid-zoom.js
+
+// Collapsible Code Blocks
+function initializeCollapsibleCodeBlocks() {
+    // Find all code blocks (both plain pre and highlighted)
+    const codeBlocks = document.querySelectorAll('.preview-slide-content pre, .preview-slide-content .highlight');
+
+    codeBlocks.forEach((block, index) => {
+        // Skip if already wrapped
+        if (block.closest('.code-block-wrapper')) return;
+
+        // Skip if it's a pre inside a highlight (already handled)
+        if (block.tagName === 'PRE' && block.closest('.highlight')) return;
+
+        // Get language from class if available
+        let language = 'code';
+        const codeElement = block.querySelector('code') || block;
+        const classList = codeElement.className || '';
+        const langMatch = classList.match(/language-(\w+)|highlight-(\w+)|(\w+)/);
+        if (langMatch) {
+            language = langMatch[1] || langMatch[2] || langMatch[3] || 'code';
+        }
+
+        // Check if this is a mermaid code block (check content for mermaid syntax)
+        const text = block.textContent || '';
+        const isMermaid = language.toLowerCase() === 'mermaid' ||
+                          text.trim().match(/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram|erDiagram|journey|gantt|pie|quadrantChart|requirementDiagram|gitGraph|mindmap|timeline)\s/i);
+
+        // Count lines
+        const lines = text.split('\n').filter(line => line.trim() !== '').length;
+
+        // Create wrapper - collapse mermaid by default
+        const wrapper = document.createElement('div');
+        wrapper.className = isMermaid ? 'code-block-wrapper collapsed' : 'code-block-wrapper';
+
+        // Create header
+        const header = document.createElement('div');
+        header.className = 'code-block-header';
+        header.innerHTML = `
+            <div class="code-info">
+                <span class="code-language">${isMermaid ? 'mermaid' : language}</span>
+                <span class="code-lines">${lines} line${lines !== 1 ? 's' : ''}</span>
+            </div>
+            <button class="code-collapse-btn" onclick="toggleCodeBlock(this)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+                <span>${isMermaid ? 'Expand' : 'Collapse'}</span>
+            </button>
+        `;
+
+        // Create content wrapper
+        const content = document.createElement('div');
+        content.className = 'code-block-content';
+
+        // Wrap the original block
+        block.parentNode.insertBefore(wrapper, block);
+        content.appendChild(block);
+        wrapper.appendChild(header);
+        wrapper.appendChild(content);
+    });
+}
+
+function toggleCodeBlock(button) {
+    const wrapper = button.closest('.code-block-wrapper');
+    const isCollapsed = wrapper.classList.toggle('collapsed');
+    const buttonText = button.querySelector('span');
+    buttonText.textContent = isCollapsed ? 'Expand' : 'Collapse';
+}

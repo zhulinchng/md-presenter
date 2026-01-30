@@ -40,7 +40,16 @@ def parse_markdown_to_slides(content):
         'md_in_html'       # Markdown inside HTML
     ]
 
-    md = markdown.Markdown(extensions=md_extensions)
+    # Configure markdown with HTML allowed
+    md = markdown.Markdown(
+        extensions=md_extensions,
+        extension_configs={
+            'codehilite': {
+                'css_class': 'highlight',
+                'linenums': False
+            }
+        }
+    )
 
     for slide_content in slides_raw:
         slide_content = slide_content.strip()
@@ -63,15 +72,45 @@ def parse_markdown_to_slides(content):
         # Process media links
         slide_content = process_media_links(slide_content)
 
+        # Extract and preserve HTML blocks (Instagram, Twitter, etc.)
+        # This pattern matches blockquotes and their associated scripts
+        html_blocks = []
+        html_block_pattern = r'(<blockquote[^>]*(?:instagram-media|twitter-tweet|tiktok-embed)[^>]*>.*?</blockquote>(?:\s*<script[^>]*>.*?</script>)?)'
+        html_blocks_found = re.findall(html_block_pattern, slide_content, re.DOTALL | re.IGNORECASE)
+
+        # Replace HTML blocks with placeholders
+        for i, block in enumerate(html_blocks_found):
+            placeholder = f'{{{{HTML_BLOCK_{i}}}}}'
+            slide_content = slide_content.replace(block, placeholder)
+            html_blocks.append(block)
+
+        # Extract remaining scripts
+        script_pattern = r'<script[^>]*>.*?</script>'
+        scripts = re.findall(script_pattern, slide_content, re.DOTALL | re.IGNORECASE)
+
+        # Temporarily remove scripts to prevent markdown from escaping them
+        for i, script in enumerate(scripts):
+            slide_content = slide_content.replace(script, f'{{{{SCRIPT_PLACEHOLDER_{i}}}}}')
+
         # Convert markdown to HTML
         html_content = md.convert(slide_content)
+
+        # Restore HTML blocks
+        for i, block in enumerate(html_blocks):
+            html_content = html_content.replace(f'{{{{HTML_BLOCK_{i}}}}}', block)
+
+        # Restore scripts
+        for i, script in enumerate(scripts):
+            html_content = html_content.replace(f'{{{{SCRIPT_PLACEHOLDER_{i}}}}}', script)
+
         md.reset()  # Reset for next slide
 
         slides.append({
             'html': html_content,
             'mermaid': mermaid_matches[0] if mermaid_matches else None,
             'notes': notes,
-            'raw': slide_content
+            'raw': slide_content,
+            'scripts': scripts  # Store scripts for later injection
         })
 
     return slides
@@ -80,11 +119,27 @@ def process_media_links(content):
     """Process custom media syntax in markdown"""
     # Video links: ![video](path.mp4) -> HTML5 video
     video_pattern = r'!\[video\]\((.*?)\)'
-    content = re.sub(video_pattern, r'<video controls><source src="\1" type="video/mp4"></video>', content)
+    content = re.sub(video_pattern, r'<video controls class="embedded-video"><source src="\1" type="video/mp4"></video>', content)
+
+    # SVG images: ![svg](path.svg) -> img tag with SVG support
+    svg_pattern = r'!\[svg\]\((.*?\.svg)\)'
+    content = re.sub(svg_pattern, r'<img src="\1" class="embedded-svg" alt="SVG Image">', content)
 
     # Images with size: ![alt](path){width=50%} -> img with style
     img_size_pattern = r'!\[(.*?)\]\((.*?)\)\{width=(.*?)\}'
     content = re.sub(img_size_pattern, r'<img alt="\1" src="\2" style="width: \3">', content)
+
+    # YouTube embeds: ![youtube](youtube.com/watch?v=VIDEO_ID) or ![youtube](youtu.be/VIDEO_ID)
+    youtube_patterns = [
+        (r'!\[youtube\]\((?:https?://)?(?:www\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]+).*?\)', r'<div class="video-embed"><iframe src="https://www.youtube.com/embed/\1" frameborder="0" allowfullscreen></iframe></div>'),
+        (r'!\[youtube\]\((?:https?://)?youtu\.be/([a-zA-Z0-9_-]+).*?\)', r'<div class="video-embed"><iframe src="https://www.youtube.com/embed/\1" frameborder="0" allowfullscreen></iframe></div>')
+    ]
+    for pattern, replacement in youtube_patterns:
+        content = re.sub(pattern, replacement, content)
+
+    # Vimeo embeds: ![vimeo](vimeo.com/VIDEO_ID)
+    vimeo_pattern = r'!\[vimeo\]\((?:https?://)?(?:www\.)?vimeo\.com/([0-9]+).*?\)'
+    content = re.sub(vimeo_pattern, r'<div class="video-embed"><iframe src="https://player.vimeo.com/video/\1" frameborder="0" allowfullscreen></iframe></div>', content)
 
     return content
 
