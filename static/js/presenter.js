@@ -5,19 +5,6 @@ let theme = localStorage.getItem('theme') || 'light';
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Mermaid first
-    if (window.mermaid) {
-        window.mermaid.initialize({
-            startOnLoad: false,
-            theme: theme === 'dark' ? 'dark' : 'default',
-            securityLevel: 'loose',
-            flowchart: {
-                htmlLabels: true,
-                useMaxWidth: true
-            }
-        });
-    }
-
     initializeWebSocket();
     initializeKeyboardShortcuts();
     initializeTheme();
@@ -27,6 +14,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Render mermaid after a short delay to ensure everything is loaded
     setTimeout(() => {
         renderMermaidDiagrams();
+        // Initialize zoom controls after mermaid renders
+        if (window.initializeMermaidZoom) {
+            window.initializeMermaidZoom();
+        }
     }, 100);
 });
 
@@ -259,19 +250,21 @@ function toggleTheme() {
     document.body.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
 
-    // Update Mermaid theme
-    if (window.mermaid) {
-        window.mermaid.initialize({
-            startOnLoad: false,
-            theme: theme === 'dark' ? 'dark' : 'default',
-            securityLevel: 'loose',
-            flowchart: {
-                htmlLabels: true,
-                useMaxWidth: true
-            }
-        });
-        renderMermaidDiagrams();
-    }
+    // Re-render mermaid diagrams with new theme
+    // Clear stored originals to force re-render
+    document.querySelectorAll('.mermaid').forEach(el => {
+        if (el.dataset.mermaidOriginal) {
+            el.textContent = el.dataset.mermaidOriginal;
+            delete el.dataset.mermaidOriginal;
+        }
+    });
+    renderMermaidDiagrams();
+    // Reinitialize zoom controls
+    setTimeout(() => {
+        if (window.initializeMermaidZoom) {
+            window.initializeMermaidZoom();
+        }
+    }, 200);
 }
 
 function initializeTheme() {
@@ -327,12 +320,23 @@ function toggleThumbnails() {
     }
 }
 
+// Get theme colors for mermaid rendering
+function getMermaidThemeColors() {
+    const isDark = theme === 'dark';
+    if (isDark) {
+        return window.beautifulMermaid.THEMES['tokyo-night'];
+    }
+    return window.beautifulMermaid.THEMES['github-light'];
+}
+
 // Mermaid Diagram Rendering
 async function renderMermaidDiagrams() {
-    if (!window.mermaid) {
-        console.error('Mermaid not loaded');
+    if (!window.beautifulMermaid) {
+        console.error('beautiful-mermaid not loaded');
         return;
     }
+
+    const { renderMermaid } = window.beautifulMermaid;
 
     // Re-render all Mermaid diagrams
     const mermaidElements = document.querySelectorAll('.mermaid');
@@ -343,7 +347,7 @@ async function renderMermaidDiagrams() {
         // Store original diagram text if not already stored
         if (!element.dataset.mermaidOriginal) {
             const originalText = element.textContent.trim();
-            if (originalText && !originalText.startsWith('<svg') && !originalText.startsWith('#mermaid-graph')) {
+            if (originalText && !originalText.startsWith('<svg')) {
                 element.dataset.mermaidOriginal = originalText;
             }
         }
@@ -351,20 +355,14 @@ async function renderMermaidDiagrams() {
         // Get the original diagram definition
         const graphDefinition = element.dataset.mermaidOriginal || element.textContent.trim();
 
-        if (!graphDefinition || graphDefinition.startsWith('<svg') || graphDefinition.startsWith('#mermaid-graph')) {
+        if (!graphDefinition || graphDefinition.startsWith('<svg')) {
             continue;
         }
 
         try {
-            const graphId = `mermaid-graph-${Date.now()}-${i}`;
-            const { svg } = await window.mermaid.render(graphId, graphDefinition);
+            const themeColors = getMermaidThemeColors();
+            const svg = await renderMermaid(graphDefinition, themeColors);
             element.innerHTML = svg;
-
-            // Initialize zoom dimensions
-            const wrapper = element.closest('.mermaid-wrapper');
-            if (wrapper && window.mermaidZoomManager) {
-                window.mermaidZoomManager.storeOriginalDimensions(wrapper);
-            }
         } catch (e) {
             console.error('Mermaid rendering error:', e);
             element.innerHTML = `<div style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px;">
@@ -373,13 +371,22 @@ async function renderMermaidDiagrams() {
             </div>`;
         }
     }
+
+    // Initialize zoom controls after rendering
+    setTimeout(() => {
+        if (window.initializeMermaidZoom) {
+            window.initializeMermaidZoom();
+        }
+    }, 100);
 }
 
 async function renderCurrentSlideMermaid() {
-    if (!window.mermaid) {
-        console.error('Mermaid not loaded');
+    if (!window.beautifulMermaid) {
+        console.error('beautiful-mermaid not loaded');
         return;
     }
+
+    const { renderMermaid } = window.beautifulMermaid;
 
     const currentSlide = document.querySelector('.slide.active');
     if (currentSlide) {
@@ -388,7 +395,7 @@ async function renderCurrentSlideMermaid() {
             // Store original diagram text if not already stored
             if (!mermaidElement.dataset.mermaidOriginal) {
                 const originalText = mermaidElement.textContent.trim();
-                if (originalText && !originalText.startsWith('<svg') && !originalText.startsWith('#mermaid-graph')) {
+                if (originalText && !originalText.startsWith('<svg')) {
                     mermaidElement.dataset.mermaidOriginal = originalText;
                 }
             }
@@ -396,18 +403,12 @@ async function renderCurrentSlideMermaid() {
             // Get the original diagram definition
             const graphDefinition = mermaidElement.dataset.mermaidOriginal || mermaidElement.textContent.trim();
 
-            if (!graphDefinition || graphDefinition.startsWith('<svg') || graphDefinition.startsWith('#mermaid-graph')) return;
+            if (!graphDefinition || graphDefinition.startsWith('<svg')) return;
 
             try {
-                const graphId = `mermaid-current-${Date.now()}`;
-                const { svg } = await window.mermaid.render(graphId, graphDefinition);
+                const themeColors = getMermaidThemeColors();
+                const svg = await renderMermaid(graphDefinition, themeColors);
                 mermaidElement.innerHTML = svg;
-
-                // Initialize zoom dimensions
-                const wrapper = mermaidElement.closest('.mermaid-wrapper');
-                if (wrapper && window.mermaidZoomManager) {
-                    window.mermaidZoomManager.storeOriginalDimensions(wrapper);
-                }
             } catch (e) {
                 console.error('Mermaid rendering error:', e);
                 mermaidElement.innerHTML = `<div style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px;">
@@ -415,6 +416,13 @@ async function renderCurrentSlideMermaid() {
                     ${e.message || e}
                 </div>`;
             }
+
+            // Initialize zoom control for this diagram
+            setTimeout(() => {
+                if (window.initializeMermaidZoom) {
+                    window.initializeMermaidZoom();
+                }
+            }, 100);
         }
     }
 }
@@ -451,38 +459,7 @@ function updateSlides(slides) {
             slideHTML += `
                 <div class="slide-mermaid">
                     <div class="mermaid-container">
-                        <div class="mermaid-wrapper" data-zoom="2">
-                            <div class="mermaid">${slide.mermaid}</div>
-                        </div>
-                    </div>
-                    <div class="mermaid-controls">
-                        <button class="mermaid-control-btn" onclick="zoomOut(this)" title="Zoom Out">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <path d="m21 21-4.35-4.35"></path>
-                                <line x1="8" y1="11" x2="14" y2="11"></line>
-                            </svg>
-                        </button>
-                        <span class="zoom-level">100%</span>
-                        <button class="mermaid-control-btn" onclick="zoomIn(this)" title="Zoom In">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <path d="m21 21-4.35-4.35"></path>
-                                <line x1="11" y1="8" x2="11" y2="14"></line>
-                                <line x1="8" y1="11" x2="14" y2="11"></line>
-                            </svg>
-                        </button>
-                        <button class="mermaid-control-btn" onclick="resetZoom(this)" title="Reset Zoom">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                                <path d="M3 3v5h5"></path>
-                            </svg>
-                        </button>
-                        <button class="mermaid-control-btn" onclick="fitToScreen(this)" title="Fit to Screen">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                            </svg>
-                        </button>
+                        <div class="mermaid">${slide.mermaid}</div>
                     </div>
                 </div>
             `;
@@ -511,6 +488,13 @@ function updateSlides(slides) {
 
     // Initialize collapsible code blocks for new content
     initializeCollapsibleCodeBlocks();
+
+    // Reinitialize zoom controls
+    setTimeout(() => {
+        if (window.initializeMermaidZoom) {
+            window.initializeMermaidZoom();
+        }
+    }, 200);
 
     // Update progress
     updateProgress();
@@ -615,7 +599,4 @@ function toggleCodeBlock(button) {
     buttonText.textContent = isCollapsed ? 'Expand' : 'Collapse';
 }
 
-// Zoom functions are now handled by mermaid-zoom.js
-
-// Mermaid interactions are now handled by mermaid-zoom.js
 

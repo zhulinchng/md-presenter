@@ -7,19 +7,6 @@ let currentSlideIndex = 0;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Mermaid first
-    if (window.mermaid) {
-        window.mermaid.initialize({
-            startOnLoad: false,
-            theme: 'default',
-            securityLevel: 'loose',
-            flowchart: {
-                htmlLabels: true,
-                useMaxWidth: true
-            }
-        });
-    }
-
     initializeEditor();
     initializeWebSocket();
     initializeKeyboardShortcuts();
@@ -174,33 +161,7 @@ function showSlidePreview(slide) {
         html += `
             <div class="preview-mermaid">
                 <div class="mermaid-container">
-                    <div class="mermaid-wrapper" data-zoom="2">
-                        <div class="mermaid">${slide.mermaid}</div>
-                    </div>
-                </div>
-                <div class="mermaid-controls">
-                    <button class="mermaid-control-btn" onclick="zoomOut(this)" title="Zoom Out">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="m21 21-4.35-4.35"></path>
-                            <line x1="8" y1="11" x2="14" y2="11"></line>
-                        </svg>
-                    </button>
-                    <span class="zoom-level">100%</span>
-                    <button class="mermaid-control-btn" onclick="zoomIn(this)" title="Zoom In">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <path d="m21 21-4.35-4.35"></path>
-                            <line x1="11" y1="8" x2="11" y2="14"></line>
-                            <line x1="8" y1="11" x2="14" y2="11"></line>
-                        </svg>
-                    </button>
-                    <button class="mermaid-control-btn" onclick="resetZoom(this)" title="Reset Zoom">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                            <path d="M3 3v5h5"></path>
-                        </svg>
-                    </button>
+                    <div class="mermaid">${slide.mermaid}</div>
                 </div>
             </div>
         `;
@@ -424,10 +385,12 @@ function initializeKeyboardShortcuts() {
 
 // Mermaid rendering
 async function renderMermaidDiagrams() {
-    if (!window.mermaid) {
-        console.error('Mermaid not loaded');
+    if (!window.beautifulMermaid) {
+        console.error('beautiful-mermaid not loaded');
         return;
     }
+
+    const { renderMermaid, THEMES } = window.beautifulMermaid;
 
     const mermaidElements = document.querySelectorAll('.mermaid');
 
@@ -437,7 +400,7 @@ async function renderMermaidDiagrams() {
         // Store original diagram text if not already stored
         if (!element.dataset.mermaidOriginal) {
             const originalText = element.textContent.trim();
-            if (originalText && !originalText.startsWith('<svg') && !originalText.startsWith('#mermaid-preview')) {
+            if (originalText && !originalText.startsWith('<svg')) {
                 element.dataset.mermaidOriginal = originalText;
             }
         }
@@ -445,20 +408,14 @@ async function renderMermaidDiagrams() {
         // Get the original diagram definition
         const graphDefinition = element.dataset.mermaidOriginal || element.textContent.trim();
 
-        if (!graphDefinition || graphDefinition.startsWith('<svg') || graphDefinition.startsWith('#mermaid-preview')) {
+        if (!graphDefinition || graphDefinition.startsWith('<svg')) {
             continue;
         }
 
         try {
-            const graphId = `mermaid-preview-${Date.now()}-${i}`;
-            const { svg } = await window.mermaid.render(graphId, graphDefinition);
+            // Use github-light theme for editor preview
+            const svg = await renderMermaid(graphDefinition, THEMES['github-light']);
             element.innerHTML = svg;
-
-            // Initialize zoom dimensions
-            const wrapper = element.closest('.mermaid-wrapper');
-            if (wrapper && window.mermaidZoomManager) {
-                window.mermaidZoomManager.storeOriginalDimensions(wrapper);
-            }
         } catch (e) {
             console.error('Mermaid rendering error:', e);
             element.innerHTML = `<div style="color: red; padding: 1rem; border: 1px solid red; border-radius: 4px;">
@@ -479,8 +436,6 @@ setInterval(function() {
         }
     }
 }, 60000); // Update every minute
-
-// Zoom functions are now handled by mermaid-zoom.js
 
 // Collapsible Code Blocks
 function initializeCollapsibleCodeBlocks() {

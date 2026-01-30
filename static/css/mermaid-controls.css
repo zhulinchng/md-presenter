@@ -1,0 +1,274 @@
+/**
+ * Mermaid Zoom Controls Styling
+ * Industrial precision aesthetic
+ */
+
+/* Control Panel */
+.mermaid-zoom-controls {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    z-index: 10;
+    opacity: 0.4;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: all;
+}
+
+.mermaid-zoom-controls:hover {
+    opacity: 1;
+}
+
+.mermaid-container:hover .mermaid-zoom-controls {
+    opacity: 1;
+}
+
+/* Control Group */
+.zoom-control-group {
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    border-radius: 0.25rem;
+    padding: 0.125rem;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .zoom-control-group {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Zoom Buttons */
+.zoom-btn {
+    width: 2rem;
+    height: 2rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.1875rem;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    padding: 0;
+}
+
+[data-theme="dark"] .zoom-btn {
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.zoom-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
+.zoom-btn:active:not(:disabled) {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.zoom-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.zoom-btn svg {
+    width: 1rem;
+    height: 1rem;
+    stroke-width: 2.5;
+}
+
+/* Button Separators */
+.zoom-control-group .zoom-btn:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0.375rem;
+    right: 0.375rem;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Zoom Indicator */
+.zoom-indicator {
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    text-align: center;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .zoom-indicator {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.zoom-value {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+    letter-spacing: 0.025em;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+/* Zoom Instructions - Top Left Position */
+.zoom-instructions {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    border-radius: 0.25rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.625rem;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.4;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    z-index: 10;
+    opacity: 0.4;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.mermaid-container:hover .zoom-instructions {
+    opacity: 1;
+}
+
+[data-theme="dark"] .zoom-instructions {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.zoom-instructions kbd {
+    display: inline-block;
+    padding: 0.125rem 0.25rem;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.125rem;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Courier New', monospace;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Reset Flash Animation */
+@keyframes reset-flash {
+    0%, 100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+.mermaid-zoom-controls.reset-flash {
+    animation: reset-flash 0.3s ease-out;
+}
+
+/* SVG Cursor States */
+.mermaid-container svg {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+.mermaid-container svg:active {
+    cursor: grabbing;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+    .mermaid-zoom-controls {
+        opacity: 0.8;
+    }
+
+    .zoom-btn {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .zoom-btn svg {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .zoom-instructions {
+        display: none;
+    }
+}
+
+/* Touch Device Improvements */
+@media (hover: none) and (pointer: coarse) {
+    .mermaid-zoom-controls {
+        opacity: 1;
+    }
+
+    .zoom-control-group {
+        background: rgba(0, 0, 0, 0.85);
+    }
+
+    [data-theme="dark"] .zoom-control-group {
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .zoom-control-group,
+    .zoom-indicator,
+    .zoom-instructions {
+        border-width: 2px;
+        border-color: currentColor;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .mermaid-zoom-controls,
+    .zoom-btn {
+        transition: none;
+    }
+
+    .zoom-btn:active:not(:disabled) {
+        transform: none;
+    }
+
+    .reset-flash {
+        animation: none;
+    }
+}
+
+/* Focus Styles for Accessibility */
+.zoom-btn:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.8);
+    outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+    .mermaid-zoom-controls {
+        display: none;
+    }
+}
