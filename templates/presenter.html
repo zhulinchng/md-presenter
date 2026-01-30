@@ -120,15 +120,14 @@
             </div>
         </main>
 
-        <!-- Thumbnail Sidebar (Hidden by default) -->
-        <aside class="thumbnail-sidebar" id="thumbnailSidebar" style="display: none;">
-            <div class="thumbnails-container">
+        <!-- Slide List Sidebar (Hidden by default, uses CSS transform) -->
+        <aside class="slide-sidebar" id="slideSidebar">
+            <div class="slide-sidebar-header">Slides</div>
+            <div class="slide-list">
                 {% for slide in slides %}
-                <div class="thumbnail {% if loop.first %}active{% endif %}" data-slide="{{ loop.index0 }}" onclick="goToSlide({{ loop.index0 }})">
-                    <div class="thumbnail-number">{{ loop.index }}</div>
-                    <div class="thumbnail-preview">
-                        {{ slide.html|safe|truncate(100) }}
-                    </div>
+                <div class="slide-item {% if loop.first %}active{% endif %}" data-slide="{{ loop.index0 }}" onclick="goToSlide({{ loop.index0 }})">
+                    <span class="slide-item-number">{{ loop.index }}</span>
+                    <span class="slide-item-title">{{ slide.title }}</span>
                 </div>
                 {% endfor %}
             </div>

@@ -1,4 +1,5 @@
 # Welcome to MD Presenter
+
 ## Transform Your Markdown into Beautiful Presentations
 
 Create stunning presentations with the power of Markdown
@@ -73,12 +74,15 @@ graph TD
 ## Media Support
 
 ### Images
+
 ![Placeholder Image](https://via.placeholder.com/600x400)
 
 ### Videos
+
 ![video](https://www.w3schools.com/html/mov_bbb.mp4)
 
 ### Custom Sizing
+
 ![Small Image](https://via.placeholder.com/300x200){width=50%}
 
 ---
@@ -201,7 +205,7 @@ flowchart LR
 
 ---
 
-## Thank You!
+## Thank You
 
 ### Start Creating Amazing Presentations
 

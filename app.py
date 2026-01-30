@@ -24,6 +24,27 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
+def extract_slide_title(content):
+    """Extract title from slide content (first heading or first line)"""
+    # Try to find a heading (# Title, ## Title, etc.)
+    heading_match = re.search(r'^#{1,6}\s+(.+)$', content, re.MULTILINE)
+    if heading_match:
+        return heading_match.group(1).strip()
+
+    # Fall back to first non-empty line
+    for line in content.split('\n'):
+        line = line.strip()
+        # Skip empty lines, code blocks, HTML tags
+        if line and not line.startswith('```') and not line.startswith('<'):
+            # Remove markdown formatting
+            line = re.sub(r'\*\*(.+?)\*\*', r'\1', line)  # bold
+            line = re.sub(r'\*(.+?)\*', r'\1', line)      # italic
+            line = re.sub(r'`(.+?)`', r'\1', line)        # code
+            line = re.sub(r'\[(.+?)\]\(.*?\)', r'\1', line)  # links
+            return line[:50] + ('...' if len(line) > 50 else '')
+
+    return 'Untitled'
+
 def parse_markdown_to_slides(content):
     """Parse markdown content and split into slides by --- separator"""
     # Split by horizontal rule (---)
@@ -105,12 +126,16 @@ def parse_markdown_to_slides(content):
 
         md.reset()  # Reset for next slide
 
+        # Extract title from slide (first heading or first line of text)
+        title = extract_slide_title(slide_content)
+
         slides.append({
             'html': html_content,
             'mermaid': mermaid_matches[0] if mermaid_matches else None,
             'notes': notes,
             'raw': slide_content,
-            'scripts': scripts  # Store scripts for later injection
+            'scripts': scripts,  # Store scripts for later injection
+            'title': title
         })
 
     return slides

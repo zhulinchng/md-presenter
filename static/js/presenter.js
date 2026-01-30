@@ -72,7 +72,7 @@ function goToSlide(index) {
 
 function showSlide(index) {
     const slides = document.querySelectorAll('.slide');
-    const thumbnails = document.querySelectorAll('.thumbnail');
+    const slideItems = document.querySelectorAll('.slide-item');
 
     // Hide all slides
     slides.forEach((slide, i) => {
@@ -90,9 +90,9 @@ function showSlide(index) {
         processEmbeddedContent(slides[index]);
     }
 
-    // Update thumbnails
-    thumbnails.forEach((thumb, i) => {
-        thumb.classList.toggle('active', i === index);
+    // Update slide list
+    slideItems.forEach((item, i) => {
+        item.classList.toggle('active', i === index);
     });
 
     // Update counter
@@ -307,17 +307,51 @@ function gotoSlide() {
     }
 }
 
-// Thumbnail Sidebar
+// Slide Sidebar
 function toggleThumbnails() {
-    const sidebar = document.getElementById('thumbnailSidebar');
-    const isVisible = sidebar.style.display !== 'none';
+    const sidebar = document.getElementById('slideSidebar');
+    sidebar.classList.toggle('show');
+}
 
-    if (isVisible) {
-        sidebar.style.display = 'none';
-    } else {
-        sidebar.style.display = 'block';
-        sidebar.classList.add('show');
-    }
+// Update slide list when slides change
+function updateSlideList(slides) {
+    const container = document.querySelector('.slide-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    slides.forEach((slide, index) => {
+        const item = document.createElement('div');
+        item.className = 'slide-item';
+        if (index === currentSlideIndex) {
+            item.classList.add('active');
+        }
+        item.setAttribute('data-slide', index);
+        item.onclick = () => goToSlide(index);
+
+        // Use title from slide data, or extract from HTML
+        let title = slide.title;
+        if (!title) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = slide.html;
+            // Try to get first heading
+            const heading = tempDiv.querySelector('h1, h2, h3, h4, h5, h6');
+            if (heading) {
+                title = heading.textContent.trim();
+            } else {
+                // Fall back to first text content
+                title = (tempDiv.textContent || '').trim().substring(0, 50);
+            }
+            title = title || 'Untitled';
+        }
+
+        item.innerHTML = `
+            <span class="slide-item-number">${index + 1}</span>
+            <span class="slide-item-title">${title}</span>
+        `;
+
+        container.appendChild(item);
+    });
 }
 
 // Get theme for mermaid rendering
@@ -475,6 +509,9 @@ function updateSlides(slides) {
     // Update total slides
     totalSlides = slides.length;
     document.getElementById('totalSlides').textContent = totalSlides;
+
+    // Update slide list
+    updateSlideList(slides);
 
     // Re-render Mermaid diagrams
     renderMermaidDiagrams();
