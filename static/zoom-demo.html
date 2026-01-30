@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -233,6 +234,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="demo-container">
         <div class="demo-header">
@@ -245,7 +247,8 @@
             <ul>
                 <li><strong>Slimmer Control Panel</strong> — Reduced padding and button sizes for minimal footprint</li>
                 <li><strong>New Reset Icon</strong> — Circular refresh arrows for clearer "reset" affordance</li>
-                <li><strong>Top-Left Instructions</strong> — Ctrl+Wheel hint moved to top-left for better visibility</li>
+                <li><strong>Top-Left Instructions</strong> — Ctrl+Wheel hint moved to top-left for better visibility
+                </li>
                 <li><strong>Tighter Spacing</strong> — More compact layout, less visual weight</li>
                 <li><strong>Optimized Sizing</strong> — 2rem buttons (down from 2.5rem) for refined appearance</li>
             </ul>
@@ -254,11 +257,15 @@
         <div class="aesthetic-notes">
             <h3>⚙️ Design Philosophy: Technical Precision</h3>
             <ul>
-                <li><strong>Industrial/Utilitarian Aesthetic</strong> — Inspired by CAD software and technical tools</li>
-                <li><strong>Glass-morphic Controls</strong> — Semi-transparent with backdrop blur, appears on demand</li>
-                <li><strong>Monochromatic Palette</strong> — Black/white with subtle depth cues, no decorative colors</li>
+                <li><strong>Industrial/Utilitarian Aesthetic</strong> — Inspired by CAD software and technical tools
+                </li>
+                <li><strong>Glass-morphic Controls</strong> — Semi-transparent with backdrop blur, appears on demand
+                </li>
+                <li><strong>Monochromatic Palette</strong> — Black/white with subtle depth cues, no decorative colors
+                </li>
                 <li><strong>Precision Feedback</strong> — Numerical zoom indicator, tabular-nums for alignment</li>
-                <li><strong>Professional Interaction</strong> — Grab cursor, smooth transformations, clear affordances</li>
+                <li><strong>Professional Interaction</strong> — Grab cursor, smooth transformations, clear affordances
+                </li>
             </ul>
         </div>
 
@@ -357,30 +364,30 @@
             <h2>Interactive Demo</h2>
             <div class="mermaid-container mermaid-demo-container">
                 <div class="mermaid">
-graph TB
-    A[Start] --> B{Decision}
-    B -->|Yes| C[Action 1]
-    B -->|No| D[Action 2]
-    C --> E[Process]
-    D --> E
-    E --> F{Another Decision}
-    F -->|Option A| G[Result A]
-    F -->|Option B| H[Result B]
-    F -->|Option C| I[Result C]
-    G --> J[End]
-    H --> J
-    I --> J
+                    graph TB
+                    A[Start] --> B{Decision}
+                    B -->|Yes| C[Action 1]
+                    B -->|No| D[Action 2]
+                    C --> E[Process]
+                    D --> E
+                    E --> F{Another Decision}
+                    F -->|Option A| G[Result A]
+                    F -->|Option B| H[Result B]
+                    F -->|Option C| I[Result C]
+                    G --> J[End]
+                    H --> J
+                    I --> J
 
-    style A fill:#667eea,stroke:#4c51bf,stroke-width:3px,color:#fff
-    style J fill:#764ba2,stroke:#553c9a,stroke-width:3px,color:#fff
-    style B fill:#48bb78,stroke:#38a169,stroke-width:2px
-    style F fill:#48bb78,stroke:#38a169,stroke-width:2px
-    style C fill:#4299e1,stroke:#3182ce,stroke-width:2px
-    style D fill:#4299e1,stroke:#3182ce,stroke-width:2px
-    style E fill:#ed8936,stroke:#dd6b20,stroke-width:2px
-    style G fill:#f6ad55,stroke:#ed8936,stroke-width:2px
-    style H fill:#f6ad55,stroke:#ed8936,stroke-width:2px
-    style I fill:#f6ad55,stroke:#ed8936,stroke-width:2px
+                    style A fill:#667eea,stroke:#4c51bf,stroke-width:3px,color:#fff
+                    style J fill:#764ba2,stroke:#553c9a,stroke-width:3px,color:#fff
+                    style B fill:#48bb78,stroke:#38a169,stroke-width:2px
+                    style F fill:#48bb78,stroke:#38a169,stroke-width:2px
+                    style C fill:#4299e1,stroke:#3182ce,stroke-width:2px
+                    style D fill:#4299e1,stroke:#3182ce,stroke-width:2px
+                    style E fill:#ed8936,stroke:#dd6b20,stroke-width:2px
+                    style G fill:#f6ad55,stroke:#ed8936,stroke-width:2px
+                    style H fill:#f6ad55,stroke:#ed8936,stroke-width:2px
+                    style I fill:#f6ad55,stroke:#ed8936,stroke-width:2px
                 </div>
             </div>
         </div>
@@ -426,4 +433,5 @@ graph TB
         renderDemo();
     </script>
 </body>
+
 </html>
