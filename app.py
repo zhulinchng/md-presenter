@@ -1,5 +1,8 @@
+import argparse
+import hashlib
 import os
 import re
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -15,6 +18,8 @@ from flask import (
     url_for,
 )
 from flask_socketio import SocketIO, emit, join_room, leave_room
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -23,8 +28,8 @@ app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max file size
 app.config["ALLOWED_EXTENSIONS"] = {"md", "markdown"}
 
-# Initialize SocketIO with eventlet
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+# Initialize SocketIO with threading (default, no extra dependencies)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # Store markdown content in memory (in production, use Redis or database)
 markdown_storage = {}
@@ -431,9 +436,162 @@ def cleanup_old_files():
         del markdown_storage[file_id]
 
 
+class MarkdownFileWatcher(FileSystemEventHandler):
+    """Watch a markdown file for changes and broadcast updates via WebSocket"""
+
+    def __init__(self, file_path, file_id, socketio_instance):
+        self.file_path = os.path.abspath(file_path)
+        self.file_id = file_id
+        self.socketio = socketio_instance
+        self.last_modified = 0
+        self.debounce_delay = 0.3  # 300ms debounce
+
+    def on_modified(self, event):
+        if event.src_path != self.file_path:
+            return
+
+        # Debounce rapid modifications (editors often write multiple times)
+        current_time = time.time()
+        if current_time - self.last_modified < self.debounce_delay:
+            return
+        self.last_modified = current_time
+
+        # Small delay to ensure file write is complete
+        time.sleep(0.1)
+
+        try:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Update storage
+            if self.file_id in markdown_storage:
+                markdown_storage[self.file_id]["content"] = content
+                slides = parse_markdown_to_slides(content)
+                markdown_storage[self.file_id]["slides"] = slides
+
+                # Broadcast update to all clients
+                self.socketio.emit(
+                    "content_updated",
+                    {"slides": slides, "content": content},
+                    room=self.file_id,
+                )
+                print(f"File updated: {os.path.basename(self.file_path)}", flush=True)
+        except Exception as e:
+            print(f"Error reading file: {e}")
+
+
+def load_markdown_file(file_path):
+    """Load a markdown file and return its file_id"""
+    abs_path = os.path.abspath(file_path)
+
+    if not os.path.exists(abs_path):
+        raise FileNotFoundError(f"File not found: {abs_path}")
+
+    if not abs_path.endswith((".md", ".markdown")):
+        raise ValueError("File must be a markdown file (.md or .markdown)")
+
+    # Generate stable file_id from absolute path
+    file_id = hashlib.md5(abs_path.encode()).hexdigest()[:12]
+
+    with open(abs_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    slides = parse_markdown_to_slides(content)
+
+    markdown_storage[file_id] = {
+        "filename": os.path.basename(abs_path),
+        "content": content,
+        "slides": slides,
+        "created_at": datetime.now(),
+        "filepath": abs_path,
+        "watched": True,  # Mark as watched file (won't be auto-deleted)
+    }
+
+    return file_id
+
+
+def start_file_watcher(file_path, file_id):
+    """Start watching a file for changes"""
+    abs_path = os.path.abspath(file_path)
+    watch_dir = os.path.dirname(abs_path)
+
+    event_handler = MarkdownFileWatcher(abs_path, file_id, socketio)
+    observer = Observer()
+    observer.schedule(event_handler, watch_dir, recursive=False)
+    observer.start()
+
+    return observer
+
+
+def parse_args():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        description="MD Presenter - Transform Markdown into presentations"
+    )
+    parser.add_argument(
+        "-m",
+        "--md-path",
+        type=str,
+        help="Path to a markdown file to watch for live updates",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to run on (default: 8080)",
+    )
+    parser.add_argument(
+        "--no-debug",
+        action="store_true",
+        help="Disable debug mode",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = parse_args()
+
     # Ensure upload directory exists
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    # Run with SocketIO
-    socketio.run(app, debug=True, host="0.0.0.0", port=8080)
+    observer = None
+
+    if args.md_path:
+        try:
+            file_id = load_markdown_file(args.md_path)
+            observer = start_file_watcher(args.md_path, file_id)
+
+            print(f"\n  Watching: {os.path.abspath(args.md_path)}", flush=True)
+            print(
+                f"  Presentation URL: http://localhost:{args.port}/present/{file_id}",
+                flush=True,
+            )
+            print(
+                f"  Editor URL: http://localhost:{args.port}/edit/{file_id}\n",
+                flush=True,
+            )
+        except (FileNotFoundError, ValueError) as e:
+            print(f"Error: {e}")
+            exit(1)
+
+    try:
+        # Run with SocketIO
+        socketio.run(
+            app,
+            debug=not args.no_debug,
+            host=args.host,
+            port=args.port,
+            use_reloader=False,  # Disable reloader when watching files
+            allow_unsafe_werkzeug=True,  # Allow Werkzeug for local development
+        )
+    finally:
+        if observer:
+            observer.stop()
+            observer.join()
