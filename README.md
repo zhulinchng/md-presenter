@@ -10,10 +10,13 @@ A modern, interactive markdown-based presentation app that transforms your Markd
 - **Mermaid Diagrams**: Beautiful flowcharts and diagrams rendered alongside your content
 - **Rich Media Support**: Embed images, videos, YouTube, Vimeo, and social media posts
 - **Keyboard Navigation**: Professional presentation controls
+- **PDF Export**: Print-optimized view (`?print`) for one-click Save-as-PDF (Chrome/Chromium)
+- **Remote Control**: QR-code join from a phone — swipe or tap to drive the deck
+- **Slide Deep Links**: `#N` in the URL restores the exact slide on reload
 - **Dark Mode**: Toggle between light and dark themes
 - **WebSocket Sync**: Real-time updates across all connected clients
 - **Speaker Notes**: Hidden notes for presenters
-- **Export Options**: Download your markdown anytime
+- **Markdown Download**: `/download/<id>` serves the raw markdown anytime
 
 ## Installation
 
@@ -24,13 +27,13 @@ git clone <your-repo-url>
 cd md-presenter
 ```
 
-1. Install Python dependencies:
+2. Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-1. Run the application:
+3. Run the application:
 
 **Option A: Upload Mode** (drag-and-drop interface)
 
@@ -46,7 +49,7 @@ python app.py -m path/to/your-presentation.md
 python app.py --md-path path/to/your-presentation.md
 ```
 
-1. Open your browser and navigate to:
+4. Open your browser and navigate to:
 
 ```
 http://localhost:8080
@@ -74,7 +77,7 @@ Options:
 - Drag and drop markdown files onto the web interface
 - Edit presentations in the browser
 - Share the generated URL with others
-- Files are stored temporarily (auto-deleted after 24 hours)
+- Files are stored temporarily (cleaned up after 24 hours by an hourly background task)
 
 **2. File Watch Mode** - Ideal for development and live presentations
 
@@ -196,7 +199,9 @@ vim my-presentation.md
 - `E` - Enter edit mode
 - `G` - Go to specific slide
 - `T` - Toggle thumbnail sidebar
-- `ESC` - Exit fullscreen
+- `R` - Open remote control QR code
+- `P` - Open PDF export view in a new tab
+- `ESC` - Exit fullscreen / close modals
 - `1-9` - Jump to slide 1-9
 
 #### Editor Mode
@@ -208,6 +213,24 @@ vim my-presentation.md
 - `Ctrl/Cmd + I` - Italic
 - `Ctrl/Cmd + K` - Insert link
 - `Ctrl/Cmd + Enter` - New slide
+
+### PDF Export
+
+Click the **PDF** button in the presenter toolbar (or open `/present/<id>?print`). All slides
+are stacked as print pages with a forced light theme. Then use the browser's print dialog:
+destination **Save as PDF**, layout **Landscape**, margins **None**, and enable
+**Background graphics**. Confirmed working in Chrome/Chromium.
+
+
+Very long slides may continue onto a second printed page rather than being cut off.
+
+### Remote Control
+
+Click the **Remote** button in the presenter toolbar and scan the displayed QR code with a
+phone on the same network. The control page shows the slide counter and Prev/Next buttons;
+swiping also navigates. Navigation is synced both ways — moving slides on the presenter
+updates the remote, and vice versa. Anyone with the control URL can navigate the deck
+(same trust model as the edit URL).
 
 ## Sample Presentations
 
@@ -226,21 +249,28 @@ python app.py -m samples/sample-presentation.md
 
 ```
 md-presenter/
-├── app.py                 # Flask application with WebSocket support
+├── app.py                      # Flask app: routes, WebSocket events, parsing, watcher
+├── requirements.txt
+├── requirements-dev.txt        # pytest
+├── samples/
+│   ├── sample-presentation.md
+│   └── media-embedding-guide.md
 ├── templates/
-│   ├── index.html        # Upload page
-│   ├── presenter.html    # Presentation view
-│   └── editor.html       # Live editor
+│   ├── index.html              # Upload page
+│   ├── presenter.html          # Presentation view
+│   └── editor.html             # Live editor
 ├── static/
 │   ├── css/
-│   │   └── style.css     # Styling
-│   ├── js/
-│   │   ├── uploader.js   # File upload handler
-│   │   ├── presenter.js  # Presentation logic
-│   │   └── editor.js     # Editor functionality
-│   └── lib/
-│       └── mermaid.min.js
-└── uploads/              # Temporary file storage
+│   │   ├── style.css           # Main styling
+│   │   └── mermaid-controls.css # Diagram zoom/pan controls
+│   └── js/
+│       ├── uploader.js         # Drag-and-drop upload handler
+│       ├── presenter.js        # Presentation logic (nav, theme, sync)
+│       ├── editor.js           # Live editor functionality
+│       └── mermaid-controls.js # Mermaid zoom & pan controller
+├── tests/                      # pytest suite
+├── docs/                       # Architecture, operations, maintenance, support guides
+└── uploads/                    # Temporary file storage (created at startup)
 ```
 
 ## Technologies Used
@@ -254,19 +284,35 @@ md-presenter/
 
 ## Security Considerations
 
-- File validation (only .md/.markdown files)
-- Secure filename handling
-- File size limits (10MB max)
-- Session-based file management
-- XSS prevention in markdown rendering
+- File validation (only `.md`/`.markdown` files are accepted)
+- Secure filename handling (`werkzeug.utils.secure_filename`)
+- File size limits (10MB max upload)
+- Secret key configurable via `MD_PRESENTER_SECRET_KEY` (random per-process fallback if unset)
+- **Markdown HTML is rendered verbatim by design** — this is what enables social media
+  embeds (Instagram/X/TikTok). Only present files you wrote or trust; do not expose the
+  app to untrusted uploaders.
+- The remote-control URL grants slide navigation to anyone who has it — share it as
+  deliberately as the edit URL
 
-## Performance Features
+## Environment Variables
 
-- Debounced live updates (300ms)
-- Lazy loading for media
-- Markdown caching
-- Efficient WebSocket communication
-- Optimized animations and transitions
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MD_PRESENTER_SECRET_KEY` | random per process | Flask session signing key. Set it to keep sessions valid across restarts. |
+| `MD_PRESENTER_CORS_ORIGINS` | `*` | Comma-separated origins allowed to open Socket.IO connections. Same-origin browser clients always work regardless of this setting. |
+
+## Storage & Cleanup
+
+- Uploaded files live in `uploads/`; their metadata is kept in an in-process dictionary,
+  so storage is **single-process** — a restart clears metadata (files on disk remain
+  until cleaned).
+- A background task runs hourly and removes uploaded presentations older than 24 hours
+  (file + entry). Watched files (`-m` mode) are never auto-deleted.
+
+## Performance Notes
+
+- Debounced live updates (300ms) in watch mode
+- Efficient WebSocket communication via Flask-SocketIO (threading async mode)
 
 ## Browser Compatibility
 
@@ -274,6 +320,23 @@ md-presenter/
 - Firefox
 - Safari
 - Edge
+
+## Testing
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -v
+```
+
+The suite covers the markdown parsing pipeline, HTTP routes, WebSocket events,
+cleanup logic, and watch-mode file handling.
+
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — components, data flow, parsing pipeline
+- [docs/operations.md](docs/operations.md) — running modes, configuration, production notes
+- [docs/maintenance.md](docs/maintenance.md) — code layout, testing, extending the parser
+- [docs/support.md](docs/support.md) — troubleshooting and FAQ
 
 ## License
 

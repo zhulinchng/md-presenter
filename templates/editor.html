@@ -118,12 +118,11 @@
     </div>
 
     <!-- Socket.IO Client -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
     <script>
         // Store initial data
         const fileId = '{{ file_id }}';
         const fileName = '{{ filename }}';
-        let slides = {{ slides|tojson }};
     </script>
     <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 </body>

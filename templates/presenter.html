@@ -64,6 +64,31 @@
                     </svg>
                     Fullscreen
                 </button>
+                <button class="nav-btn" id="remoteBtn" onclick="openRemoteModal()" title="Remote control (R)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                        <path d="M6 12l3 3 3-3-3-3z"></path>
+                        <circle cx="16.5" cy="7.5" r="1"></circle>
+                        <circle cx="16.5" cy="16.5" r="1"></circle>
+                    </svg>
+                    Remote
+                </button>
+                <button class="nav-btn" id="pdfBtn" onclick="openPrintView()" title="Export as PDF (P)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                    </svg>
+                    PDF
+                </button>
+                <button class="nav-btn" id="downloadBtn" onclick="window.location.href='{{ url_for('download', file_id=file_id) }}'" title="Download markdown">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Save
+                </button>
                 <button class="nav-btn" id="themeBtn" onclick="toggleTheme()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -144,14 +169,27 @@
                 </div>
             </div>
         </div>
+
+        <!-- Remote Control Modal -->
+        <div class="modal" id="remoteModal" style="display: none;">
+            <div class="modal-content">
+                <h3>Remote Control</h3>
+                <p>Scan the QR code with your phone to control this presentation:</p>
+                <img src="{{ url_for('qr_image', file_id=file_id) }}" alt="QR code linking to the remote control page" class="qr-code">
+                <code class="remote-url">{{ url_for('control', file_id=file_id, _external=True) }}</code>
+                <div class="modal-actions">
+                    <button onclick="closeRemoteModal()">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Socket.IO Client -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
     <script>
         // Store file ID for WebSocket communication
         const fileId = '{{ file_id }}';
-        const totalSlides = {{ total_slides }};
+        let totalSlides = {{ total_slides }};
         let currentSlideIndex = 0;
     </script>
 

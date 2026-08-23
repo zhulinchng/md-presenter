@@ -16,7 +16,8 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The app runs on `http://localhost:8080` with SocketIO support using eventlet.
+The app runs on `http://localhost:8080` (port configurable with `-p`) using Flask-SocketIO
+in `threading` async mode (no extra async dependencies).
 
 ## Architecture
 
@@ -28,7 +29,8 @@ The app runs on `http://localhost:8080` with SocketIO support using eventlet.
 - Markdown parsing happens in `parse_markdown_to_slides()` which splits content by `---` separators
 - In-memory storage (`markdown_storage` dict) holds presentation data keyed by UUID file IDs
 - WebSocket rooms organized by file_id for multi-client synchronization
-- Automatic file cleanup after 24 hours via `cleanup_old_files()`
+- Automatic cleanup: a background task runs hourly and calls `cleanup_old_files()`,
+  deleting uploaded presentations older than 24 hours (watched files are exempt)
 
 **Frontend Structure**
 
@@ -84,8 +86,10 @@ The app runs on `http://localhost:8080` with SocketIO support using eventlet.
 
 - File IDs are UUIDs stored in Flask session
 - Uploaded files saved to `uploads/` directory with UUID-based filenames
-- `markdown_storage` is in-memory (use Redis or database for production)
-- Files auto-deleted after 24 hours
+- `markdown_storage` is in-memory (single-process; use Redis or a database for
+  multi-process deployments)
+- Uploaded files auto-deleted after 24 hours by the hourly cleanup background task;
+  watched files (`-m` mode) are never auto-deleted
 
 ## Markdown Extensions
 
@@ -188,3 +192,18 @@ Sample presentations are available in the `samples/` directory:
 
 - `sample-presentation.md` - Demonstrates all features
 - `media-embedding-guide.md` - Shows all media embed types
+
+## Testing
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/ -v
+```
+
+- `tests/test_parsing.py` — slide parsing pipeline, title extraction, media links
+- `tests/test_routes.py` — HTTP routes and upload validation
+- `tests/test_socket.py` — WebSocket events via the Flask-SocketIO test client
+- `tests/test_cleanup.py` — 24-hour cleanup (watched-file exemption)
+- `tests/test_watch.py` — watch-mode file loading and debounce
+
+See `docs/` for architecture, operations, maintenance, and support guides.

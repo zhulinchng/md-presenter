@@ -398,18 +398,18 @@ class MermaidZoomController {
 }
 
 // Auto-initialize for all mermaid containers
+// Controllers are tracked per container (WeakMap) so repeated calls — e.g. after
+// every live update in presenter.js — do not stack duplicate observers/listeners.
+const mermaidControllers = new WeakMap();
+
 function initializeMermaidZoom() {
     const containers = document.querySelectorAll('.mermaid-container');
-    const controllers = new Map();
 
     containers.forEach(container => {
-        if (!controllers.has(container)) {
-            const controller = new MermaidZoomController(container);
-            controllers.set(container, controller);
+        if (!mermaidControllers.has(container)) {
+            mermaidControllers.set(container, new MermaidZoomController(container));
         }
     });
-
-    return controllers;
 }
 
 // Export for use in presenter.js

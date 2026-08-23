@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote - {{ filename }} - MD Presenter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="control-page">
+    <div class="control-container">
+        <header class="control-header">
+            <span class="file-name">{{ filename }}</span>
+        </header>
+
+        <div class="control-counter">
+            <span id="ctlCurrent">1</span> / <span id="ctlTotal">{{ total_slides }}</span>
+        </div>
+
+        <div class="control-pad">
+            <button class="control-btn" id="ctlPrevBtn" onclick="previousSlide()" aria-label="Previous slide">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                Prev
+            </button>
+            <button class="control-btn" id="ctlNextBtn" onclick="nextSlide()" aria-label="Next slide">
+                Next
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+        </div>
+
+        <p class="control-hint">Swipe or tap to navigate the presentation</p>
+    </div>
+
+    <!-- Socket.IO Client -->
+    <script src="{{ url_for('static', filename='js/vendor/socket.io.min.js') }}"></script>
+    <script>
+        // Store state for controller.js
+        const fileId = '{{ file_id }}';
+        let totalSlides = {{ total_slides }};
+        let currentPage = 0;
+    </script>
+    <script src="{{ url_for('static', filename='js/controller.js') }}"></script>
+</body>
+</html>

@@ -1,12 +1,16 @@
 import argparse
 import hashlib
+import io
 import os
 import re
+import secrets
 import time
 import uuid
 from datetime import datetime, timedelta
 
 import markdown
+import qrcode
+from qrcode.image.svg import SvgPathImage
 from flask import (
     Flask,
     flash,
@@ -14,6 +18,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    Response,
     session,
     url_for,
 )
@@ -23,13 +28,23 @@ from watchdog.observers import Observer
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "your-secret-key-change-in-production"
+app.config["SECRET_KEY"] = (
+    os.environ.get("MD_PRESENTER_SECRET_KEY") or secrets.token_hex(32)
+)
 app.config["UPLOAD_FOLDER"] = "uploads"
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB max file size
 app.config["ALLOWED_EXTENSIONS"] = {"md", "markdown"}
 
-# Initialize SocketIO with threading (default, no extra dependencies)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+# Ensure the upload directory exists at import time (not just in __main__)
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+# CORS origins configurable via comma-separated env var (default: allow all,
+# since LAN presenting is an intended use case)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=os.environ.get("MD_PRESENTER_CORS_ORIGINS", "*").split(","),
+    async_mode="threading",
+)
 
 # Store markdown content in memory (in production, use Redis or database)
 markdown_storage = {}
@@ -66,6 +81,8 @@ def extract_slide_title(content):
 
 def parse_markdown_to_slides(content):
     """Parse markdown content and split into slides by --- separator"""
+    # Normalize CRLF line endings so the separator regex works on any platform
+    content = content.replace("\r\n", "\n")
     # Split by horizontal rule (---)
     slides_raw = re.split(r"\n---+\n", content)
 
@@ -254,6 +271,7 @@ def upload_file():
             "slides": slides,
             "created_at": datetime.now(),
             "filepath": filepath,
+            "current_page": 0,
         }
 
         # Store file_id in session
@@ -334,17 +352,63 @@ def check_presentation(file_id):
     )
 
 
+@app.route("/control/<file_id>")
+def control(file_id):
+    """Remote control view for slide navigation"""
+    if file_id not in markdown_storage:
+        flash("Presentation not found")
+        return redirect(url_for("index"))
+
+    data = markdown_storage[file_id]
+    return render_template(
+        "control.html",
+        file_id=file_id,
+        filename=data["filename"],
+        total_slides=len(data["slides"]),
+    )
+
+
+@app.route("/qr/<file_id>")
+def qr_image(file_id):
+    """SVG QR code linking to the remote control page"""
+    if file_id not in markdown_storage:
+        return jsonify({"error": "Not found"}), 404
+
+    target = request.url_root.rstrip("/") + url_for("control", file_id=file_id)
+    img = qrcode.make(target, image_factory=SvgPathImage)
+    buf = io.BytesIO()
+    img.save(buf)
+    return Response(buf.getvalue(), mimetype="image/svg+xml")
+
+
+@app.route("/download/<file_id>")
+def download(file_id):
+    """Download the raw markdown file"""
+    if file_id not in markdown_storage:
+        return jsonify({"error": "Not found"}), 404
+
+    data = markdown_storage[file_id]
+    filename = secure_filename(data["filename"])
+    if not filename.endswith(".md"):
+        filename += ".md"
+    return Response(
+        data["content"],
+        mimetype="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 # WebSocket events
 @socketio.on("connect")
 def handle_connect():
     """Handle client connection"""
-    print(f"Client connected: {request.sid}")
+    app.logger.info("Client connected: %s", request.sid)
 
 
 @socketio.on("disconnect")
 def handle_disconnect():
     """Handle client disconnection"""
-    print(f"Client disconnected: {request.sid}")
+    app.logger.info("Client disconnected: %s", request.sid)
 
 
 @socketio.on("join_presentation")
@@ -369,6 +433,9 @@ def handle_update_content(data):
     """Handle live content updates from editor"""
     file_id = data.get("file_id")
     content = data.get("content")
+
+    if not isinstance(content, str):
+        return
 
     if file_id and file_id in markdown_storage:
         # Update content
@@ -398,7 +465,9 @@ def handle_change_page(data):
     file_id = data.get("file_id")
     page = data.get("page")
 
-    if file_id:
+    if isinstance(page, int) and page >= 0:
+        if file_id and file_id in markdown_storage:
+            markdown_storage[file_id]["current_page"] = page
         emit("page_changed", {"page": page}, room=file_id, include_self=False)
 
 
@@ -413,6 +482,7 @@ def handle_request_sync(data):
             {
                 "content": markdown_storage[file_id]["content"],
                 "slides": markdown_storage[file_id]["slides"],
+                "current_page": markdown_storage[file_id].get("current_page", 0),
             },
         )
 
@@ -424,13 +494,15 @@ def cleanup_old_files():
     to_remove = []
 
     for file_id, data in markdown_storage.items():
+        if data.get("watched"):
+            continue  # watched files live outside uploads/ and are managed manually
         if data["created_at"] < cutoff:
             to_remove.append(file_id)
             # Remove file
             try:
                 os.remove(data["filepath"])
-            except:
-                pass
+            except OSError as e:
+                app.logger.warning("Could not remove %s: %s", data["filepath"], e)
 
     for file_id in to_remove:
         del markdown_storage[file_id]
@@ -475,9 +547,19 @@ class MarkdownFileWatcher(FileSystemEventHandler):
                     {"slides": slides, "content": content},
                     room=self.file_id,
                 )
-                print(f"File updated: {os.path.basename(self.file_path)}", flush=True)
+                app.logger.info("File updated: %s", os.path.basename(self.file_path))
         except Exception as e:
-            print(f"Error reading file: {e}")
+            app.logger.error("Error reading %s: %s", self.file_path, e)
+
+
+CLEANUP_INTERVAL_SECONDS = 3600  # hourly
+
+
+def cleanup_loop():
+    """Background task that periodically removes expired uploads"""
+    while True:
+        cleanup_old_files()
+        socketio.sleep(CLEANUP_INTERVAL_SECONDS)
 
 
 def load_markdown_file(file_path):
@@ -505,6 +587,7 @@ def load_markdown_file(file_path):
         "created_at": datetime.now(),
         "filepath": abs_path,
         "watched": True,  # Mark as watched file (won't be auto-deleted)
+        "current_page": 0,
     }
 
     return file_id
@@ -558,9 +641,6 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    # Ensure upload directory exists
-    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
     observer = None
 
     if args.md_path:
@@ -580,6 +660,10 @@ if __name__ == "__main__":
         except (FileNotFoundError, ValueError) as e:
             print(f"Error: {e}")
             exit(1)
+
+
+    # Start the hourly cleanup background task
+    socketio.start_background_task(cleanup_loop)
 
     try:
         # Run with SocketIO

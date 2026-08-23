@@ -3,8 +3,32 @@ let socket = null;
 let isFullscreen = false;
 let theme = localStorage.getItem('theme') || 'light';
 
+// Print/PDF export mode (?print query param)
+const isPrintMode = new URLSearchParams(window.location.search).has('print');
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // PDF export mode: stack all slides via CSS, skip slide navigation
+    if (isPrintMode) {
+        document.body.classList.add('print-mode');
+    }
+
+    // Resume from #N deep link
+    const hashMatch = window.location.hash.match(/^#(\d+)$/);
+    if (hashMatch) {
+        currentSlideIndex = Math.min(parseInt(hashMatch[1], 10), totalSlides - 1);
+        showSlide(currentSlideIndex);
+    }
+
+    // Follow manually-pasted #N links. Safe against loops: replaceState
+    // never fires hashchange, so only external hash edits reach here.
+    window.addEventListener('hashchange', function() {
+        const m = window.location.hash.match(/^#(\d+)$/);
+        if (m) {
+            goToSlide(Math.min(parseInt(m[1], 10), totalSlides - 1));
+        }
+    });
+
     initializeWebSocket();
     initializeKeyboardShortcuts();
     initializeTheme();
@@ -64,6 +88,7 @@ function previousSlide() {
 }
 
 function goToSlide(index) {
+    if (isPrintMode) return;
     if (index >= 0 && index < totalSlides) {
         currentSlideIndex = index;
         showSlide(currentSlideIndex);
@@ -71,6 +96,7 @@ function goToSlide(index) {
 }
 
 function showSlide(index) {
+    if (isPrintMode) return;
     const slides = document.querySelectorAll('.slide');
     const slideItems = document.querySelectorAll('.slide-item');
 
@@ -106,6 +132,11 @@ function showSlide(index) {
 
     // Re-render Mermaid diagrams for current slide
     renderCurrentSlideMermaid();
+
+    // Update the URL hash so the current slide can be deep-linked/reloaded
+    if (window.history && history.replaceState) {
+        history.replaceState(null, '', '#' + index);
+    }
 }
 
 // Process embedded content (Instagram, Twitter, etc.)
@@ -176,11 +207,22 @@ function initializeKeyboardShortcuts() {
                 e.preventDefault();
                 showGotoModal();
                 break;
+            case 'r':
+            case 'R':
+                e.preventDefault();
+                openRemoteModal();
+                break;
+            case 'p':
+            case 'P':
+                e.preventDefault();
+                openPrintView();
+                break;
             case 'Escape':
                 if (isFullscreen) {
                     toggleFullscreen();
                 }
                 closeGotoModal();
+                closeRemoteModal();
                 break;
             case 't':
             case 'T':
@@ -208,6 +250,14 @@ function initializeKeyboardShortcuts() {
 }
 
 // Fullscreen Mode
+function updateFullscreenButton() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (!fullscreenBtn) return;
+    fullscreenBtn.innerHTML = isFullscreen ?
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg> Exit' :
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg> Fullscreen';
+}
+
 function toggleFullscreen() {
     const container = document.querySelector('.presentation-container');
 
@@ -221,8 +271,6 @@ function toggleFullscreen() {
         } else if (container.msRequestFullscreen) {
             container.msRequestFullscreen();
         }
-        container.classList.add('fullscreen');
-        isFullscreen = true;
     } else {
         if (document.exitFullscreen) {
             document.exitFullscreen();
@@ -233,16 +281,20 @@ function toggleFullscreen() {
         } else if (document.msExitFullscreen) {
             document.msExitFullscreen();
         }
-        container.classList.remove('fullscreen');
-        isFullscreen = false;
     }
-
-    // Update button icon
-    const fullscreenBtn = document.getElementById('fullscreenBtn');
-    fullscreenBtn.innerHTML = isFullscreen ?
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg> Exit' :
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg> Fullscreen';
 }
+
+// Keep fullscreen state in sync when the user exits via the browser UI (ESC)
+function syncFullscreenState() {
+    isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const container = document.querySelector('.presentation-container');
+    if (container) {
+        container.classList.toggle('fullscreen', isFullscreen);
+    }
+    updateFullscreenButton();
+}
+document.addEventListener('fullscreenchange', syncFullscreenState);
+document.addEventListener('webkitfullscreenchange', syncFullscreenState);
 
 // Theme Toggle
 function toggleTheme() {
@@ -293,6 +345,22 @@ function showGotoModal() {
 function closeGotoModal() {
     const modal = document.getElementById('gotoModal');
     modal.style.display = 'none';
+}
+
+// Remote Control Modal
+function openRemoteModal() {
+    document.getElementById('remoteModal').style.display = 'flex';
+}
+
+function closeRemoteModal() {
+    document.getElementById('remoteModal').style.display = 'none';
+}
+
+// Open the print-friendly view in a new tab for PDF export
+function openPrintView() {
+    if (!isPrintMode) {
+        window.open(`/present/${fileId}?print`, '_blank');
+    }
 }
 
 function gotoSlide() {
@@ -457,6 +525,11 @@ async function renderCurrentSlideMermaid() {
 // Update Slides (for live editing)
 function updateSlides(slides) {
     const container = document.getElementById('slidesContainer');
+
+    // Clamp the index if the live edit removed slides
+    if (currentSlideIndex >= slides.length) {
+        currentSlideIndex = Math.max(0, slides.length - 1);
+    }
     const currentIndex = currentSlideIndex;
 
     // Clear existing slides
@@ -526,8 +599,8 @@ function updateSlides(slides) {
         }
     }, 200);
 
-    // Update progress
-    updateProgress();
+    // Re-apply active state, counter, and progress for the (possibly clamped) index
+    showSlide(currentSlideIndex);
 }
 
 // Touch/Swipe Support

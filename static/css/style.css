@@ -1950,3 +1950,184 @@ body {
         opacity: 1 !important;
     }
 }
+
+/* ============================================
+   Remote Control Page
+   ============================================ */
+.control-page {
+    height: 100vh;
+    overflow: hidden;
+    touch-action: pan-y;
+}
+
+.control-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    height: 100%;
+    padding: 1.5rem;
+}
+
+.control-header {
+    max-width: 100%;
+    text-align: center;
+}
+
+.control-header .file-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    max-width: 90vw;
+}
+
+.control-counter {
+    font-size: 3.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.control-pad {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.control-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.25rem 2.5rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.control-btn svg {
+    width: 28px;
+    height: 28px;
+}
+
+.control-btn:active {
+    transform: scale(0.96);
+    background: var(--bg-tertiary);
+}
+
+.control-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.control-hint {
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+}
+
+/* ============================================
+   Print Mode (?print) - PDF Export
+   Stacks all slides as pages; use the browser's
+   Print > Save as PDF (Chrome/Chromium).
+   ============================================ */
+
+/* Force the light palette regardless of the active theme */
+.print-mode,
+.print-mode[data-theme="dark"] {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f4f6;
+    --bg-tertiary: #e5e7eb;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --text-tertiary: #9ca3af;
+    --border-color: #d1d5db;
+}
+
+/* Hide presentation chrome on screen too */
+.print-mode .presenter-nav,
+.print-mode .progress-indicator,
+.print-mode .slide-sidebar,
+.print-mode .modal {
+    display: none;
+}
+
+/* Stack every slide instead of showing only the active one */
+.print-mode .slides-container {
+    display: block;
+}
+
+.print-mode .slide {
+    position: static;
+    top: auto;
+    left: auto;
+    width: 100%;
+    height: auto;
+    min-height: 80vh;
+    opacity: 1;
+    transform: none;
+    transition: none;
+    break-after: page;
+    page-break-after: always;
+}
+
+.print-mode .slide:last-child {
+    break-after: auto;
+    page-break-after: auto;
+}
+
+@media print {
+    @page {
+        size: A4 landscape;
+        margin: 0;
+    }
+
+    /* Let the stacked slide flow span multiple printed pages */
+    .print-mode .presentation-container,
+    .print-mode .slide-viewport,
+    .print-mode .slides-container {
+        display: block;
+        height: auto;
+        min-height: 0;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .print-mode .slide-viewport {
+        padding: 0;
+    }
+    /* 80vh (screen preview) exceeds one landscape page; let content size slides */
+    .print-mode .slide {
+        height: auto;
+        min-height: 0;
+    }
+}
+
+/* Remote Control Modal (presenter) */
+.qr-code {
+    display: block;
+    width: 220px;
+    height: auto;
+    margin: 1rem auto;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.remote-url {
+    display: block;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+    margin-bottom: 1rem;
+}
